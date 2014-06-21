@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<product productid="username_change" active="1">
+	<title>Change User Name</title>
+	<description>Username Change by Zarinpal:  Allow your members to change their own usernames at a per-usergroup interval. Also includes a Member Info history block. Development and Programming payment by Omid Aran</description>
+	<version>1.00</version>
+	<url>http://omidtak.ir/forum/</url>
+	<dependencies>
+	</dependencies>
+	<codes>
+		<code version="*">
+			<installcode><![CDATA[
+if (!file_exists(DIR . '/username_change/class_profileblock.php'))
+{
+	print_dots_stop();
+	print_cp_message('! Please upload the files before installing');
+}
+
+function print_modification_message($msg)
+{
+	echo $msg;
+	vbflush();
+	usleep(500000);
+}
+
+require_once(DIR . '/includes/class_dbalter.php');
+$db_alter = new vB_Database_Alter_MySQL($db);
+
+// Add the usergroup field
+if ($db_alter->fetch_table_info('usergroup'))
+{
+	$db_alter->add_field(array(
+		'name'       => 'usernamechangepermissions',
+		'type'       => 'int',
+		'length'     => '10',
+		'attributes' => 'unsigned',
+		'null'       => false,	// True = NULL, false = NOT NULL
+		'default'    => '0'
+	));
+	$db_alter->add_field(array(
+		'name'       => 'username_changedelay',
+		'type'       => 'smallint',
+		'length'     => '5',
+		'attributes' => 'unsigned',
+		'null'       => false,	// True = NULL, false = NOT NULL
+		'default'    => '90'
+	));
+	$db_alter->add_field(array(
+		'name'       => 'username_historylimit',
+		'type'       => 'smallint',
+		'length'     => '5',
+		'attributes' => 'unsigned',
+		'null'       => false,	// True = NULL, false = NOT NULL
+		'default'    => '5'
+	));
+	$db_alter->add_field(array(
+		'name'       => 'username_numchanges',
+		'type'       => 'smallint',
+		'length'     => '5',
+		'attributes' => 'unsigned',
+		'null'       => false,	// True = NULL, false = NOT NULL
+		'default'    => '5'
+	));
+	$db_alter->add_field(array(
+		'name'       => 'username_price',
+		'type'       => 'smallint',
+		'length'     => '5',
+		'attributes' => 'unsigned',
+		'null'       => false,	// True = NULL, false = NOT NULL
+		'default'    => '100'
+	));
+}
+
+$shortname = 'usernamechange';
+
+require_once(DIR . '/includes/class_bitfield_builder.php');
+if (vB_Bitfield_Builder::build(false) !== false)
+{
+	$myobj =& vB_Bitfield_Builder::init();
+	$myobj->data = $myobj->fetch(DIR . '/includes/xml/bitfield_username_change.xml', false, true);
+}
+else
+{
+	echo "<strong>error</strong>\n";
+	print_r(vB_Bitfield_Builder::fetch_errors());
+}
+
+
+$groupinfo = array();
+foreach ($myobj->data['ugp']["{$shortname}permissions"] AS $permtitle => $permvalue)
+{
+	if (empty($permvalue['group']))
+	{
+		continue;
+	}
+
+	if (!empty($permvalue['install']))
+	{
+		foreach ($permvalue['install'] AS $gid)
+		{
+			$groupinfo["$gid"]["{$shortname}permissions"] += $permvalue['value'];
+		}
+	}
+}
+
+foreach ($groupinfo as $usergroupid => $permissions)
+{
+	$perms = $permissions["{$shortname}permissions"];
+	$db->query_write("
+		UPDATE " . TABLE_PREFIX . "usergroup
+		SET {$shortname}permissions = $perms
+		WHERE usergroupid = $usergroupid
+	");
+}
+build_forum_permissions();
+
+// Update settings
+build_options();
+vBulletinHook::build_datastore($db);]]></installcode>
+			<uninstallcode><![CDATA[require_once(DIR . '/includes/class_dbalter.php');
+$db_alter =& new vB_Database_Alter_MySQL($db);
+
+function print_modification_message($msg)
+{
+	echo $msg;
+	vbflush();
+	usleep(500000);
+}
+
+// Reverted Tables
+
+// Drop
+if ($db_alter->fetch_table_info('usergroup'))
+{
+	$db_alter->drop_field('usernamechangepermissions');
+	$db_alter->drop_field('username_changedelay');
+	$db_alter->drop_field('username_historylimit');
+	$db_alter->drop_field('username_numchanges');
+	$db_alter->drop_field('username_price');
+}]]></uninstallcode>
+		</code>
+	</codes>
+	<templates>
+		<template name="username_change_editusername" templatetype="template" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[<h3 class="blocksubhead">{vb:rawphrase username_change_usernamechange}</h3>
+<div class="blockrow">
+	<p class="description">
+		<vb:if condition="$vbulletin->userinfo['permissions']['usernamechangepermissions'] & $vbulletin->bf_ugp_usernamechangepermissions['canchangeown']">
+			<vb:if condition="$vbulletin->userinfo['permissions']['username_changedelay'] > 0">
+				{vb:rawphrase username_change_description, {vb:raw bbuserinfo.permissions.username_changedelay}}
+			<vb:else />
+				{vb:rawphrase username_change_always}
+			</vb:if>
+		</vb:if>
+		<vb:if condition="$lastchange">
+			<vb:if condition="$vbulletin->userinfo['permissions']['usernamechangepermissions'] & $vbulletin->bf_ugp_usernamechangepermissions['canchangeown']"><br /></vb:if>
+			{vb:rawphrase username_change_lastchange, {vb:raw lastchange}}<br />
+			<vb:if condition="$bbuserinfo['permissions']['username_numchanges']">
+			{vb:rawphrase username_change_numchanges, {vb:raw numchanges}, {$bbuserinfo.permissions.username_numchanges}}<vb:else />{vb:rawphrase username_change_numchanges_nolimit, {vb:raw numchanges}}</vb:if>
+		</vb:if>
+	</p>
+	<vb:if condition="$show['changeusername']"><label for="tb_editusername">{vb:rawphrase username_change_edit_username}</label></vb:if>
+		<vb:if condition="$show['changeusername']">
+			<input type="text" class="primary textbox" name="username" id="tb_editusername" value="" maxlength="{vb:raw vboptions.ctMaxChars}" />
+			<vb:if condition="$vbulletin->userinfo['permissions']['username_price'] !=0">
+				<p class="description">{vb:rawphrase username_price_description, {vb:raw bbuserinfo.permissions.username_price}}</p>
+			</vb:if>
+		<vb:else />
+			{vb:raw changeusername_reason}
+		</vb:if>
+</div>]]></template>
+		<template name="username_change_member_block" templatetype="template" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[<div id="view-usernamehistory" class="<vb:if condition="$selected_tab == 'usernamehistory'">selected_view_section<vb:else />view_section</vb:if>">
+	<div class="subsection">
+		<vb:if condition="$block_data['usernamehistory']">
+		
+			<dl class="historyblock">
+				<dt style="font-weight:bold;">{vb:rawphrase username_changed_old_username}</dt>
+				<dd style="font-weight:bold;">{vb:rawphrase username_changed_new_username}</dd>
+				<dd style="font-weight:bold;">{vb:rawphrase username_changed_changed_date}</dd>
+			</dl>
+			
+			{vb:raw block_data.usernamehistory}
+			
+		<vb:else />
+		
+			{vb:rawphrase username_changed_user_has_no_history, {vb:raw prepared.username}}
+			
+		</vb:if>
+	</div>
+</div>]]></template>
+		<template name="username_change_member_block_bit" templatetype="template" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[		<dl class="historyblock">
+			<dt>{vb:raw entry.oldvalue}</dt>
+			<dd>{vb:raw entry.newvalue}</dd>
+			<dd>{vb:raw entry.change_time}</dd>
+		</dl>]]></template>
+		<template name="username_change_member_css" templatetype="template" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[<style type="text/css">
+dl.historyblock dt {
+	display:block;
+	float:{vb:stylevar left};
+	clear:{vb:stylevar left};
+	width:20%;
+}
+
+dl.historyblock dd {
+	display:block;
+	float:{vb:stylevar left};
+	width:20%;
+	margin-{vb:stylevar left}:{vb:stylevar padding};
+}
+</style>]]></template>
+	</templates>
+	<stylevardfns>
+	</stylevardfns>
+	<stylevars>
+	</stylevars>
+	<plugins>
+		<plugin active="1" executionorder="5">
+			<title>Change Username</title>
+			<hookname>init_startup</hookname>
+			<phpcode><![CDATA[@session_start();
+if (!class_exists('nusoap_client')) {	
+	include_once(DIR . '/username_change/hooks/lib/nusoap_client.php');
+}]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Template Caching - Global</title>
+			<hookname>cache_templates</hookname>
+			<phpcode><![CDATA[require_once(DIR . '/username_change/hooks/cache_templates.php');]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Member Profile: Add Username History Tab</title>
+			<hookname>member_build_blocks_start</hookname>
+			<phpcode><![CDATA[require_once(DIR . '/username_change/hooks/member_build_blocks_start.php');]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>Member Profile: Display Username History Tab</title>
+			<hookname>member_complete</hookname>
+			<phpcode><![CDATA[require_once(DIR . '/username_change/hooks/member_complete.php');]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>UserCP - Change Username Form</title>
+			<hookname>profile_complete</hookname>
+			<phpcode><![CDATA[require_once(DIR . '/username_change/hooks/profile_complete.php');]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="5">
+			<title>UserCP - Do Change Username</title>
+			<hookname>profile_updateprofile</hookname>
+			<phpcode><![CDATA[require_once(DIR . '/username_change/hooks/profile_updateoptions.php');]]></phpcode>
+		</plugin>
+		<plugin active="1" executionorder="1">
+			<title>verify</title>
+			<hookname>process_templates_complete</hookname>
+			<phpcode><![CDATA[if ($_REQUEST['do'] == 'cun'){
+	if ($_GET['order_id'] == $_SESSION['order_id']) {
+
+		$price = $vbulletin->userinfo['permissions']['username_price'];						
+		$Authority = $_SESSION['Authority'];
+		
+		$client = new nusoap_client('https://de.zarinpal.com/pg/services/WebGate/wsdl', 'wsdl');
+		$res = $client->call("PaymentVerification", array(
+								array(
+									'MerchantID'	=> $vbulletin->options['username_pin_zp'],
+									'Authority' 	=> $Authority,
+									'Amount'	    => $price
+								)
+							)
+		);	
+	
+		if($res['Status'] == 100){
+			$_SESSION['verify_ok'] = 1; 
+			echo "<div style='display:none'>		
+					<form name='verify' action='profile.php?do=updateprofile' method='post' id='profileform' class='block'>
+						<input class='button' value='ذخیره تغییرات' tabindex='1' accesskey='s' type='submit'>
+						<input name='s' value='' type='hidden'>	
+						<input type='hidden' value='{$vbulletin->userinfo['securitytoken_raw']}' name='securitytoken'>
+						<input name='do' value='updateprofile' type='hidden'>
+					</form>
+				</div>
+				<script language='javascript'>document.verify.submit(); </script>";
+		} else 
+			eval(standard_error('پرداخت شما تایید نشده است .')); 
+			
+	} else 
+		eval(standard_error('سفارشی با این مشخصات یافت نشد .')); 
+}
+require_once(DIR . '/username_change/hooks/profile_updateoptions.php');]]></phpcode>	
+	    </plugin>
+		<plugin active="1" executionorder="5">
+			<title>Template Grouping</title>
+			<hookname>template_groups</hookname>
+			<phpcode><![CDATA[require_once(DIR . '/username_change/hooks/template_groups.php');]]></phpcode>
+		</plugin>
+	</plugins>
+	<phrases>
+		<phrasetype name="Permissions" fieldname="cppermission">
+			<phrase name="username_change_permissions" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تنظیمات تغییر نام کاربری]]></phrase>
+			<phrase name="username_can_change_own" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[این گروه کاربری بتواند عنوان کاربری خود را تغییر دهد.]]></phrase>
+			<phrase name="username_can_view_others_history" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[اجازه نمایش تغییرات نام کاربری توسط سایر کاربران]]></phrase>
+			<phrase name="username_can_view_own_history" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[اجازه نمایش تاریخچه تغییر نام کاربری]]></phrase>
+			<phrase name="username_change_delay" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[زمان تاخیر برای تغییر دوباره نام کاربری ( برحسب روز )
+<dfn>(برای غیر فعال کردن این گزینه عدد "0" را وارد نمایید)</dfn>]]></phrase>
+			<phrase name="username_history_limit" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[محدود کردن تاریخچه نام کاربری
+<dfn>اگر  "0" باشد ، کاربران می توانند هر گونه سابقه نام کاربری را مشاهده کنند، صرف نظر از تنظیمات بالا</dfn>]]></phrase>
+			<phrase name="username_change_limit" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[محدود کردن تغییر نام کاربری
+<dfn>تعداد دفعات تغییر نام کاربری (برای غیر فعال کردن این گزینه عدد "0" را وارد نمایید)</dfn>]]></phrase>
+			<phrase name="username_pr" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[هزینه تغییر نام کاربری<dfn>هزینه ای که کاربر بابت تغییر نام کاربری پرداخت مینماید را به تومان وارد نمایید.<br/>برای تغییر نام کاربری بصورت رایگان عدد "0" راوارد نمایید</dfn>]]></phrase>
+		</phrasetype>
+		<phrasetype name="Error Messages" fieldname="error">
+			<phrase name="changed_username_successfully" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تغییر نام کاربری با موفقیت انجام شد.]]></phrase>
+			<phrase name="username_change_nochange" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[در حال حاضر شما نمیتوانید نام کاربری خود را تغییر دهید.]]></phrase>
+			<phrase name="username_change_username_taken" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[نام کاربری انتخاب شده قبلا ثبت شده است.]]></phrase>
+		</phrasetype>
+		<phrasetype name="GLOBAL" fieldname="global">
+			<phrase name="username_change" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تغییر نام کاربری]]></phrase>
+			<phrase name="username_changed_changed_date" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تاریخ تغییر نام کاربری]]></phrase>
+			<phrase name="username_changed_new_username" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[نام کاربری جدید]]></phrase>
+			<phrase name="username_changed_old_username" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[نام کاربری قبلی]]></phrase>
+			<phrase name="username_changed_user_has_no_history" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[{1} هیچ رکوردی برای تغییر نام کاربری ثبت نشده است.]]></phrase>
+			<phrase name="username_history" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تاریخچه تغییرات نام کاربری]]></phrase>
+		</phrasetype>
+		<phrasetype name="User Tools (global)" fieldname="user">
+			<phrase name="change_username_cooldown" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[نام کاربری شما تغییر کرده است و تا زمان مشخص شده امکان تغییر مجدد وجود ندارد.]]></phrase>
+			<phrase name="change_username_limit" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تعداد دفعات تغییر نام کاربری شما به اتمام رسیده است.]]></phrase>
+			<phrase name="change_username_nopermission" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[شما اجازه دسترسی به تغییر نام کاربری خود را ندارید!]]></phrase>
+			<phrase name="username_change_always" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[شما بدون محدودیت زمان میتوانید نام کاربری خود را تغییر دهید.]]></phrase>
+			<phrase name="username_change_description" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[شما فقط هر <strong>{1} روز یکبار می توانید نام کاربری خود را تعویض نمایید</strong>.]]></phrase>
+			<phrase name="username_price_description" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[توجه فرمایید که هزینه تغییر نام کاربری <strong>{1}</strong> تومان می باشد که به صورت آنلاین به درگاه پرداخت جهت پرداخت هزینه متصل خواهید شد.]]></phrase>
+			<phrase name="username_change_edit_username" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[ویرایش نام کاربری]]></phrase>
+			<phrase name="username_change_lastchange" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[آخرین تغییر نام کاربری :  <strong>{1}</strong>.]]></phrase>
+			<phrase name="username_change_numchanges" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[شما <b>{1}</b> بار از <b>{2}</b> بار نام کاربری خود را تغییر داده اید .]]></phrase>
+			<phrase name="username_change_numchanges_nolimit" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[شما <b>{1}</b> بار نام کاربری خود را تغییر داده اید.]]></phrase>
+			<phrase name="username_change_usernamechange" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[تغییر نام کاربری - اختیاری]]></phrase>
+		</phrasetype>
+		<phrasetype name="vBulletin Settings" fieldname="vbsettings">
+			<phrase name="setting_username_donate_desc" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[آیا می خواهید نویسنده پلاگین را حمایت کنید؟!<a href='http://epay.omidtak.ir'>اینجا کلیک کنید!</a>]]></phrase>
+			<phrase name="setting_username_donate_title" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[حمایت نویسنده پلاگین]]></phrase>
+			<phrase name="setting_username_pin_zp_desc" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[مرچنت کد درگاه زرین پال را وارد نمایید.]]></phrase>
+			<phrase name="setting_username_pin_zp_title" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[مرچنت کد درگاه زرین پال]]></phrase>
+			<phrase name="settinggroup_username_gateway_settings" date="1402923850" username="OM!DTAK" version="1.00"><![CDATA[هک تغییر نام کاربری با همکاری زرین پال]]></phrase>
+		</phrasetype>
+	</phrases>
+	<options>
+		<settinggroup name="username_gateway_settings" displayorder="65535">
+			<setting varname="username_pin_zp" displayorder="10">
+				<datatype>free</datatype>
+			</setting>
+			<setting varname="username_donate" displayorder="20">
+				<datatype>free</datatype>
+				<optioncode><![CDATA[نویسنده : <a href='mailto:info@omidtak.ir' target='_blank'>امید آران</a>]]></optioncode>
+			</setting>
+		</settinggroup>
+	</options>
+	<helptopics>
+		<helpscript name="options">
+			<helptopic disp="70" act="options" opt="vbshout_memberlist" />
+		</helpscript>
+	</helptopics>
+	<cronentries>
+	</cronentries>
+	<faqentries>
+	</faqentries>
+</product>

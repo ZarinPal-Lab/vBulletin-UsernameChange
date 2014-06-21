@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<bitfields product="username_change">
+	<bitfielddefs>
+		<group name="ugp">
+			<group name="usernamechangepermissions">
+				<bitfield group="username_change_permissions"					name="canchangeown"				phrase="username_can_change_own"			install="2,5,6,7">1</bitfield>
+				<bitfield group="username_change_permissions"					name="canviewownhistory"		phrase="username_can_view_own_history"		install="2,5,6,7">4</bitfield>
+				<bitfield group="username_change_permissions"					name="canviewhistory"			phrase="username_can_view_others_history"	install="2,5,6,7">8</bitfield>
+				<bitfield group="username_change_permissions" intperm="true"	name="username_changedelay"	    phrase="username_change_delay"								 >1</bitfield>
+				<bitfield group="username_change_permissions" intperm="true"	name="username_historylimit"	phrase="username_history_limit"								 >1</bitfield>
+				<bitfield group="username_change_permissions" intperm="true"	name="username_numchanges"   	phrase="username_change_limit"								 >1</bitfield>
+				<bitfield group="username_change_permissions" intperm="true"	name="username_price"	        phrase="username_pr"			       					     >1</bitfield>
+			</group>
+		</group>
+	</bitfielddefs>
+</bitfields>
