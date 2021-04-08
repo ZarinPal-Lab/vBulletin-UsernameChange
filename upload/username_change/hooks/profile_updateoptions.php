@@ -48,8 +48,15 @@ if (($vbulletin->userinfo['permissions']['usernamechangepermissions'] & $vbullet
 
 			$_SESSION['Authority'] = $res['data']['authority'];
 			if ($res['data']['code'] == 100){
-				header('location:https://www.zarinpal.com/pg/StartPay/'.$res['data']["authority"]);
-				exit;
+                echo' <html><body>
+                    <script type="text/javascript" src="https://cdn.zarinpal.com/zarinak/v1/checkout.js"></script>
+                    <script type="text/javascript">
+                    window.onload = function () {
+                    Zarinak.setAuthority("' . $res['data']['authority'] . '");
+                    Zarinak.showQR();
+                    Zarinak.open();
+                     };
+                    </script></body></html>';
 			} else 
 				eval(standard_error('؛با عرض پوزش درگاه پرداخت در حال حاضر آماده نمیباشد ؛ کد خطا :  .' . $res['data']['code'] ));
 		}
