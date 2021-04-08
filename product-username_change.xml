@@ -216,10 +216,7 @@ dl.historyblock dd {
 		<plugin active="1" executionorder="5">
 			<title>Change Username</title>
 			<hookname>init_startup</hookname>
-			<phpcode><![CDATA[@session_start();
-if (!class_exists('nusoap_client')) {	
-	include_once(DIR . '/username_change/hooks/lib/nusoap_client.php');
-}]]></phpcode>
+			<phpcode><![CDATA[@session_start();]]></phpcode>
 		</plugin>
 		<plugin active="1" executionorder="5">
 			<title>Template Caching - Global</title>
@@ -254,18 +251,25 @@ if (!class_exists('nusoap_client')) {
 
 		$price = $vbulletin->userinfo['permissions']['username_price'];						
 		$Authority = $_SESSION['Authority'];
-		
-		$client = new nusoap_client('https://de.zarinpal.com/pg/services/WebGate/wsdl', 'wsdl');
-		$res = $client->call("PaymentVerification", array(
-								array(
-									'MerchantID'	=> $vbulletin->options['username_pin_zp'],
-									'Authority' 	=> $Authority,
-									'Amount'	    => $price
-								)
-							)
-		);	
-	
-		if($res['Status'] == 100){
+
+		$param_verify = array("merchant_id" => $vbulletin->options['username_pin_zp'],, "$Authority" => $Authority, "amount" => $price);
+        $jsonData = json_encode($param_verify);
+        $ch = curl_init('https://api.zarinpal.com/pg/v4/payment/verify.json');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v4');
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Content-Length: ' . strlen($jsonData)
+        ));
+
+        $res = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        $res = json_decode($res, true);
+
+		if($res['data']['code'] == 100){
 			$_SESSION['verify_ok'] = 1; 
 			echo "<div style='display:none'>		
 					<form name='verify' action='profile.php?do=updateprofile' method='post' id='profileform' class='block'>

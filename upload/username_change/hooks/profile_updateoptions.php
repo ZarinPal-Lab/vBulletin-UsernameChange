@@ -23,25 +23,35 @@ if (($vbulletin->userinfo['permissions']['usernamechangepermissions'] & $vbullet
 			$_SESSION['order_id'] = $order_id;
 			$callback = $vbulletin->options['bburl'].'/forum.php?do=cun&order_id='.$order_id;
 			$description_zp = 'Change username from '.$vbulletin->userinfo['username'].' to '.$_POST['username'];
-						
-			$client = new nusoap_client('https://de.zarinpal.com/pg/services/WebGate/wsdl', 'wsdl');				
-			$res = $client->call("PaymentRequest", array(
-														array(
-															'MerchantID' 	=> $vbulletin->options['username_pin_zp'],
-															'Amount' 	    => $price,
-															'Description' 	=> $description_zp,
-															'Email' 	    => $vbulletin->userinfo['email'],
-															'Mobile' 	    => 0,
-															'CallbackURL' 	=> $callback
-														)
-													)
-			);
-			$_SESSION['Authority'] = $res['Authority'];
-			if ($res['Status'] == 100){
-				header('location:https://www.zarinpal.com/pg/StartPay/'.$res['Authority'] .'/ZarinGate');
+
+            $param_request = array(
+                'merchant_id' => $vbulletin->options['username_pin_zp'],
+                'amount' => $price,
+                'description' => $description_zp,
+                'callback_url' => $callback
+            );
+            $jsonData = json_encode($param_request);
+
+            $ch = curl_init('https://api.zarinpal.com/pg/v4/payment/request.json');
+            curl_setopt($ch, CURLOPT_USERAGENT, 'ZarinPal Rest Api v4');
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'POST');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen($jsonData)
+            ));
+
+            $res = curl_exec($ch);
+            $err = curl_error($ch);
+            $res = json_decode($res, true, JSON_PRETTY_PRINT);
+
+			$_SESSION['Authority'] = $res['data']['authority'];
+			if ($res['data']['code'] == 100){
+				header('location:https://www.zarinpal.com/pg/StartPay/'.$res['data']["authority"]);
 				exit;
 			} else 
-				eval(standard_error('؛با عرض پوزش درگاه پرداخت در حال حاضر آماده نمیباشد ؛ کد خطا :  .' . $res['Status'] ));							
+				eval(standard_error('؛با عرض پوزش درگاه پرداخت در حال حاضر آماده نمیباشد ؛ کد خطا :  .' . $res['data']['code'] ));
 		}
 		
 		if ($vbulletin->userinfo['permissions']['username_changedelay'])
